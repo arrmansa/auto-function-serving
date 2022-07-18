@@ -1,0 +1,9 @@
+LICENSE
+README.md
+pyproject.toml
+src/auto_function_serving/ServerHandler.py
+src/auto_function_serving/__init__.py
+src/auto_function_serving.egg-info/PKG-INFO
+src/auto_function_serving.egg-info/SOURCES.txt
+src/auto_function_serving.egg-info/dependency_links.txt
+src/auto_function_serving.egg-info/top_level.txt
