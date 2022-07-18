@@ -1,7 +1,8 @@
 import pickle
 from multiprocessing import Process
 from subprocess import Popen
-import urllib3
+import urllib.request
+import time
 
 import socket
 import inspect
@@ -110,8 +111,7 @@ class ServerHandler():
             self.port = port
             
         logging.info(f"using port {port} for {callable_name}")
-        self.server_addr = f'http://{ServerHandler.ip_address}:{self.port}'
-        self.PoolManager = urllib3.PoolManager()
+        self.server_address = f'http://{ServerHandler.ip_address}:{self.port}'
         
         self.backend = backend
         self.server_code = self.base_code.format(callable_code = inspect.cleandoc(callable_code), 
@@ -125,12 +125,13 @@ class ServerHandler():
             logging.warning(f"port {self.port} not available to bind, server not started from here")
             
         if wait_until_working:
-            retry = urllib3.util.Retry(total = 15,backoff_factor = 0.01)
-            success = self.PoolManager.request('GET', self.server_addr, timeout = 0.1, retries = retry)
+            for attempt in range(100):
+                try: urllib.request.urlopen(self.server_address).close(); break
+                except: assert attempt < 99; time.sleep(min(1, 0.01 * (2**attempt)))
     
     def __call__(self, *args, **kwargs):
-        request = self.PoolManager.request('POST', self.server_addr, body = pickle.dumps((args,kwargs)))
-        return pickle.loads(request.data)
+        with urllib.request.urlopen(self.server_address, pickle.dumps((args,kwargs))) as f:
+            return pickle.loads(f.read())
     
     def __del__(self):
         try: self.server_process.kill()
@@ -142,12 +143,11 @@ class ServerHandler():
         atexit.unregister(self.__del__)
         
     def __getstate__(self):
-        return {"port" : self.port, "server_addr":self.server_addr, 
+        return {"port" : self.port, "server_address":self.server_address, 
                 "backend" : self.backend, "server_code" : self.server_code}
     
     def __setstate__(self, d):
-        self.server_addr = d["server_addr"]
-        self.PoolManager = urllib3.PoolManager()
+        self.server_address = d["server_address"]
         self.backend = d["backend"]
         self.server_code = d["server_code"]
         self.server_process = None
