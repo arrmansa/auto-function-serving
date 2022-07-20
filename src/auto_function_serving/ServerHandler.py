@@ -12,6 +12,14 @@ import hashlib
 import logging
 
 
+#TODO - build a function to return a class that inherits from ServerHandler and allows user to configure more options
+#def advanced_decorator():
+#    class returnableclass(ServerHandler):
+#        #someonfigurationere
+#    return returnableclass
+
+#TODO - build a class that inherits from ServerHandler and allows user to run multiple instances of the function
+
 class ServerHandler():
     
     base_code = inspect.cleandoc("""
@@ -19,17 +27,16 @@ class ServerHandler():
     import socket
     tempsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tempsocket.bind(("{ip_address}", {port}))
-
     #Minimum import
     from http.server import HTTPServer, BaseHTTPRequestHandler
     import pickle
-
     #Maximum socket backlog, is 5 by default
     #https://docs.python.org/3/library/socket.html#socket.socket.listen
     import socketserver
     socketserver.TCPServer.request_queue_size = 128
-
     #Function to serve
+    
+    # TODO - catch exceptions in callable_code and handle it (maybe tempsocket.close() or sys.exit()
     {callable_code}
     
     #Server
@@ -78,16 +85,26 @@ class ServerHandler():
                 return True
             
     @staticmethod
-    def decorator(func, port = None, backend = 'Popen', wait_until_working = True):
-        if func.__module__ == '__main__':
-            #workaround to get function
-            function_code = inspect.cleandoc(inspect.getsource(func))
-            decorator_string = '@ServerHandler.decorator'
-            function_code = function_code[function_code.find(decorator_string) + len(decorator_string):]
+    def decorator(func, port = None, backend = 'multiprocessing', wait = True):
+        #assert hasattr(func, '__call__'), "decorated object should be callable"  #possible check to be added
+        if hasattr(func, '__globals__'):
+            globaldict = func.__globals__ #PROBABLY A FUNCTION
+        elif hasattr(func.__call__, '__globals__'):
+            globaldict = func.__call__.__globals__ #PROBABLY A CLASS
         else:
+            globaldict = None
+        if func.__module__ != '__main__' and 'auto_function_serving.ServerHandler' not in str(globaldict):
             function_code = f"from {func.__module__} import {func.__name__}"
-        return ServerHandler(function_code, func.__name__, port = port, backend = backend, wait_until_working = wait_until_working)
+        else:
+            function_code = inspect.cleandoc(inspect.getsource(func))
+            decorator_string = '@ServerHandler.decorator\n'
+            if -1 < function_code.find("@ServerHandler.decorator\n") < function_code.find(f" {func.__name__}"):
+                function_code = function_code.replace("@ServerHandler.decorator\n", "", 1)
+            #TODO - pass globaldict to the server if possible, add option to do it
+            #TODO - maybe use ast and inspect.getsourcefile() to add the rest of the code to make it work
+        return ServerHandler(function_code, func.__name__, port = port, backend = backend, wait = wait)
     
+    #Default backend is multiprocessing because Popen doesn't open python in same env
     @staticmethod
     def run_code_async(server_code, backend):
         logging.info(f'using backend {backend}')
@@ -102,7 +119,7 @@ class ServerHandler():
             raise ValueError(f"Unknown Backend {backend}")
         return server_process
     
-    def __init__(self, callable_code, callable_name, port = None, backend = 'Popen', wait_until_working = True):
+    def __init__(self, callable_code, callable_name, port = None, backend = 'multiprocessing', wait = True):
         if port is None:
             self.port = ServerHandler.get_specific_port(callable_code)
         elif not isinstance(port, int):
@@ -119,12 +136,12 @@ class ServerHandler():
                                                      ip_address = ServerHandler.ip_address, port = self.port)
         if not ServerHandler.port_inuse(self.port):
             self.server_process = ServerHandler.run_code_async(self.server_code, self.backend)
-            atexit.register(self.__del__)
+            atexit.register(self.__del__) #Killing the run_code_async process is hard
         else:
             self.server_process = None
             logging.warning(f"port {self.port} not available to bind, server not started from here")
             
-        if wait_until_working:
+        if wait:
             for attempt in range(100):
                 try: urllib.request.urlopen(self.server_address).close(); break
                 except: assert attempt < 99; time.sleep(min(1, 0.01 * (2**attempt)))
@@ -133,6 +150,7 @@ class ServerHandler():
         with urllib.request.urlopen(self.server_address, pickle.dumps((args,kwargs))) as f:
             return pickle.loads(f.read())
     
+    #Try everything to kill the stray popen or multiprocessing process
     def __del__(self):
         try: self.server_process.kill()
         except: pass
