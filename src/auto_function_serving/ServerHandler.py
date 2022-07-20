@@ -96,7 +96,7 @@ class ServerHandler():
         if func.__module__ != '__main__' and 'auto_function_serving.ServerHandler' not in str(globaldict):
             function_code = f"from {func.__module__} import {func.__name__}"
         else:
-            function_code = inspect.cleandoc(inspect.getsource(func))
+            function_code = inspect.cleandoc('\n' + inspect.getsource(func))
             decorator_string = '@ServerHandler.decorator\n'
             if -1 < function_code.find("@ServerHandler.decorator\n") < function_code.find(f" {func.__name__}"):
                 function_code = function_code.replace("@ServerHandler.decorator\n", "", 1)
@@ -131,7 +131,7 @@ class ServerHandler():
         self.server_address = f'http://{ServerHandler.ip_address}:{self.port}'
 
         self.backend = backend
-        self.server_code = self.base_code.format(callable_code=inspect.cleandoc(callable_code),
+        self.server_code = self.base_code.format(callable_code=inspect.cleandoc('\n' + callable_code),
                                                  callable_name=callable_name,
                                                  ip_address=ServerHandler.ip_address, port=self.port)
         if not ServerHandler.port_inuse(self.port):
