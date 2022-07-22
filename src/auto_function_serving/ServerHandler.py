@@ -20,6 +20,24 @@ import logging
 
 # TODO - build a class that inherits from ServerHandler and allows user to run multiple instances of the function
 
+import asyncio
+import aiohttp
+
+class AsyncServerHandler(ServerHandler):
+    async def __call__(self, *args, **kwargs):
+        response = await self.Client_Session.post(self.server_address, data = pickle.dumps((args, kwargs)))
+        async with response:
+            return pickle.loads(await response.read())
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        self.Client_Session = aiohttp.ClientSession(raise_for_status=True)
+        
+    def __setstate__(self, *args, **kwargs):
+        super().__setstate__(*args,**kwargs)
+        self.Client_Session = aiohttp.ClientSession(raise_for_status=True)
+
+
 class ServerHandler():
 
     base_code = inspect.cleandoc("""
@@ -62,23 +80,23 @@ class ServerHandler():
     ip_address = "127.0.0.1"
 
     @staticmethod
-    def get_free_port():
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind((ServerHandler.ip_address, 0))
-            ip_addr, port = s.getsockname()
-            return port
-
-    @staticmethod
     def get_specific_port(source_code, minimum=50000, maximum=60000):
         hashbytes = hashlib.md5(source_code.encode()).digest()
         port = minimum + int.from_bytes(hashbytes, "big") % (maximum - minimum)
         return port
 
     @staticmethod
-    def port_inuse(port):
+    def get_free_port(ip_address):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((ip_address, 0))
+            ip_addr, port = s.getsockname()
+            return port
+
+    @staticmethod
+    def port_inuse(ip_address,port):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
-                s.bind((ServerHandler.ip_address, port))
+                s.bind((ip_address, port))
                 return False
             except OSError:
                 logging.warning(f"port {port} is in use")
@@ -93,7 +111,7 @@ class ServerHandler():
             globaldict = func.__call__.__globals__  # PROBABLY A CLASS
         else:
             globaldict = None
-        if func.__module__ != '__main__' and 'auto_function_serving.ServerHandler' not in str(globaldict):
+        if func.__module__ != '__main__' and cls.__module__ not in str(globaldict):
             function_code = f"from {func.__module__} import {func.__name__}"
         else:
             function_code = inspect.cleandoc('\n' + inspect.getsource(func))
@@ -102,7 +120,7 @@ class ServerHandler():
                 function_code = function_code.replace(decorator_string, "", 1)
             # TODO - pass globaldict to the server if possible, add option to do it
             # TODO - maybe use ast and inspect.getsourcefile() to add the rest of the code to make it work
-        return ServerHandler(function_code, func.__name__, port=port, backend=backend, wait=wait)
+        return cls(function_code, func.__name__, port=port, backend=backend, wait=wait)
 
     # Default backend is multiprocessing because Popen doesn't open python in same env
     @staticmethod
@@ -121,21 +139,21 @@ class ServerHandler():
 
     def __init__(self, callable_code, callable_name, port=None, backend='multiprocessing', wait=True):
         if port is None:
-            self.port = ServerHandler.get_specific_port(callable_code)
+            self.port = self.get_specific_port(callable_code)
         elif not isinstance(port, int):
-            self.port = get_free_port()
+            self.port = get_free_port(self.ip_address)
         else:
             self.port = port
 
         logging.info(f"using port {port} for {callable_name}")
-        self.server_address = f'http://{ServerHandler.ip_address}:{self.port}'
+        self.server_address = f'http://{self.ip_address}:{self.port}'
 
         self.backend = backend
         self.server_code = self.base_code.format(callable_code=inspect.cleandoc('\n' + callable_code),
                                                  callable_name=callable_name,
-                                                 ip_address=ServerHandler.ip_address, port=self.port)
-        if not ServerHandler.port_inuse(self.port):
-            self.server_process = ServerHandler.run_code_async(self.server_code, self.backend)
+                                                 ip_address=self.ip_address, port=self.port)
+        if not self.port_inuse(self.ip_address, self.port):
+            self.server_process = self.run_code_async(self.server_code, self.backend)
             atexit.register(self.__del__)  # Killing the run_code_async process is hard
         else:
             self.server_process = None
