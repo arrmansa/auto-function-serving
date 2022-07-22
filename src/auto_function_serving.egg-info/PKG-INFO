@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: auto-function-serving
-Version: 0.0.5
+Version: 0.1.0
 Summary: A python package to offload a function call to an http server automatically using a decorator.
 Author-email: Arrman Anicket Saha <arrmansa99+430@gmail.com>
 Project-URL: Homepage, https://github.com/arrmansa/auto-function-serving
@@ -8,20 +8,22 @@ Project-URL: Bug Tracker, https://github.com/arrmansa/auto-function-serving/issu
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: Apache Software License
 Classifier: Operating System :: OS Independent
-Requires-Python: >=3.6
+Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 License-File: LICENSE
 
 # auto-function-serving
 
-A python package to offload a function call to an http server running on localhost automatically using a decorator. Should work with multiprocessing, pickle, flask and others.
+A python package to offload a function call to an http server running on localhost automatically using a decorator. Compatible with multiprocessing, pickle, flask, fastapi, async etc..
 
 ## Why
 
 Imagine a case of a multi threaded or multiprocessing application where 1 or few functions are heavily resource (cpu or memory) intensive, but the other functions can run in parallel.\
 Example - an api call followed by tokenization and classification using a large DL model followed by further API calls.\
-In such a case, it would make sense to create a server (using torchserve or tfserving) to serve requests.\
-ServerHandler does this automatically during runtime
+In such a case, it would make sense to create a server (using torchserve or tfserving) to serve requests, and replace the function call with a post request to the server.\
+ServerHandler does this automatically during runtime.\
+AsyncServerHandler is also available which uses aiohttp to make the requests async.
+AsyncServerHandler has the same usage as ServerHandler, except calls need to have await before it.
 
 ## Reccomended Usage
 ```python
@@ -92,10 +94,14 @@ We know the function is ready after we can recieve a valid get request from the 
 Inputs and outputs are sent as bytes, converted to and from objects using pickle.
 
 ## Performance (On my machine)
-using urllib.request seemed to give the best performance.\
-~2ms overhead for small input and output (few bytes).\
-~10ms overhead for 0.5 mb input and output (1mb total transfer).\
-~60ms overhead for 5 mb input and output (10 mb total transfer).
+overhead for small input and output (few bytes) - 
+~2ms for requests with urllib.request
+~5ms for async requests with aiohttp.ClientSession
+
+overhead for large input and output
+~10ms for 0.5 mb input and output (1mb total transfer).\
+~60ms for 5 mb input and output (10 mb total transfer).
+~600ms for 50 mb input and output (100 mb total transfer).
 
 ## Other things to look into
 Libraries : Celery, Tfserving, Torchserve, Flask\

@@ -1,16 +1,18 @@
+#Core functionality
 import pickle
 from multiprocessing import Process
 from subprocess import Popen
 import urllib.request
 import time
-
+#Convenience 
 import socket
 import inspect
 import atexit
 import hashlib
-
 import logging
-
+#For Async
+import asyncio
+import aiohttp
 
 # TODO - build a function to return a class that inherits from ServerHandler and allows user to configure more options
 # def advanced_decorator():
@@ -20,28 +22,6 @@ import logging
 
 # TODO - build a class that inherits from ServerHandler and allows user to run multiple instances of the function
 
-import asyncio
-import aiohttp
-
-class AsyncServerHandler(ServerHandler):
-
-    async def __call__(self, *args, **kwargs):
-        response = await self.ClientSession.post(self.server_address, data = pickle.dumps((args, kwargs)))
-        async with response:
-            return pickle.loads(await response.read())
-        
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args,**kwargs)
-        self.ClientSession = aiohttp.ClientSession(raise_for_status=True)
-        
-    def __setstate__(self, *args, **kwargs):
-        super().__setstate__(*args,**kwargs)
-        self.ClientSession = aiohttp.ClientSession(raise_for_status=True)
-        
-    def __del__(self):
-        await self.ClientSession.close()
-        del self.ClientSession
-        super().__del__(self)
         
 class ServerHandler():
 
@@ -192,3 +172,26 @@ class ServerHandler():
         self.backend = d["backend"]
         self.server_code = d["server_code"]
         self.server_process = None
+
+
+class AsyncServerHandler(ServerHandler):
+
+    async def __call__(self, *args, **kwargs):
+        response = await self.ClientSession.post(self.server_address, data = pickle.dumps((args, kwargs)))
+        async with response:
+            return pickle.loads(await response.read())
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        self.ClientSession = aiohttp.ClientSession(raise_for_status=True)
+        
+    def __setstate__(self, *args, **kwargs):
+        super().__setstate__(*args,**kwargs)
+        self.ClientSession = aiohttp.ClientSession(raise_for_status=True)
+        
+    def __del__(self):
+        try: asyncio.run(self.ClientSession.close())
+        except: pass
+        try: del self.ClientSession
+        except: pass
+        super().__del__(self)
