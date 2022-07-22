@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: auto-function-serving
-Version: 0.1.1
+Version: 0.1.2
 Summary: A python package to offload a function call to an http server automatically using a decorator.
 Author-email: Arrman Anicket Saha <arrmansa99+430@gmail.com>
 Project-URL: Homepage, https://github.com/arrmansa/auto-function-serving
@@ -20,27 +20,61 @@ A python package to offload a function call to an http server running on localho
 
 Imagine a case of a multi threaded or multiprocessing application where 1 or few functions are heavily resource (cpu or memory) intensive, but the other functions can run in parallel.\
 Example - an api call followed by tokenization and classification using a large DL model followed by further API calls.\
-In such a case, it would make sense to create a server (using torchserve or tfserving) to serve requests, and replace the function call with a post request to the server.\
-ServerHandler does this automatically during runtime.\
-AsyncServerHandler is also available which uses aiohttp to make the requests async.
+In such a case, it would make sense to create a server (generally using torchserve or tfserving) to serve requests, and replace the function call with a post request to the server.\
+ServerHandler does this automatically during runtime. (Although it might be slower than a 'proper' server)\
+AsyncServerHandler is also available which uses [aiohttp](https://docs.aiohttp.org/) to make the requests async, for use with fastapi and other async use cases.
 AsyncServerHandler has the same usage as ServerHandler, except calls need to have await before it.
-
+ 
 ## Reccomended Usage
+When the somemodule does not have any expensive global loading.
 ```python
-from somemodule import someheavyfunction
 from auto_function_serving.ServerHandler import ServerHandler
+from somemodule import someheavyfunction
 someheavyfunction = ServerHandler.decorator(someheavyfunction)
 ```
+if there is some global loading
+```python
+from auto_function_serving.ServerHandler import ServerHandler
+someheavyfunction = ServerHandler("""
+from somemodule import someheavyfunction
+""", "someheavyfunction")
+```
 Any calls to this new **someheavyfunction** will make requests to 1 instance of a process running a [http.server.HTTPServer](https://docs.python.org/3/library/http.server.html) which runs the function within it. Even calls made from different processes, threads, multiprocessing or servers like flask.\
-It can also be used like a traditional decorator for functions with no dependencies specified outside the function.
+It can also be used like a traditional decorator for functions with no dependencies outside the function.
 ```python
 from auto_function_serving.ServerHandler import ServerHandler
 @ServerHandler.decorator
-def someheavyfunctionwithnodependency(args,**kwargs):
+def someheavyfunction(args,**kwargs):
     for i in range(big_number)
         someexpensivecomputation
 ```
-
+imports inside the function will work
+```python
+from auto_function_serving.ServerHandler import ServerHandler
+@ServerHandler.decorator
+def someheavyfunction(args,**kwargs):
+    import numpy as np
+```
+```python
+from auto_function_serving.ServerHandler import ServerHandler
+@ServerHandler.decorator
+def someheavyfunction(args,**kwargs):
+	if not hasattr(someheavyfunction,'RunOnce'):
+	global np
+	import numpy as np
+	setattr(someheavyfunction,'RunOnce',None)
+	... etc
+```
+but the better way to do it might be
+```python
+from auto_function_serving.ServerHandler import ServerHandler
+someheavyfunction = ServerHandler("""
+import numpy as np
+def someheavyfunction(args,**kwargs):
+	np.ones(1000) 
+	...
+""", "someheavyfunction")
+```
 ## Installation
 
 Use the package manager pip to install [auto_function_serving](https://pypi.org/project/auto-function-serving/)
@@ -99,7 +133,7 @@ overhead for small input and output (few bytes) - \
 ~5ms for async requests with aiohttp.ClientSession \
 overhead for large input and output\
 ~10ms for 0.5 mb input and output (1mb total transfer).\
-~60ms for 5 mb input and output (10 mb total transfer).
+~60ms for 5 mb input and output (10 mb total transfer).\
 ~600ms for 50 mb input and output (100 mb total transfer).
 
 ## Other things to look into

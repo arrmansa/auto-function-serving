@@ -57,6 +57,8 @@ class ServerHandler():
             self.send_response(200)
             self.end_headers()
             self.wfile.write(pickle.dumps(output_to_return))
+        def log_message(*args,**kwargs):
+            return None
     #Run
     tempsocket.close()
     httpd = HTTPServer(("{ip_address}", {port}), functionserver)
@@ -88,7 +90,7 @@ class ServerHandler():
                 return True
 
     @classmethod
-    def decorator(cls, func, port=None, backend='multiprocessing', wait=True, backlog = 1024):
+    def decorator(cls, func, port=None, backend='multiprocessing', wait=100, backlog = 1024):
         # assert hasattr(func, '__call__'), "decorated object should be callable"  #possible check to be added
         if hasattr(func, '__globals__'):
             globaldict = func.__globals__  # PROBABLY A FUNCTION
@@ -105,38 +107,48 @@ class ServerHandler():
                 function_code = function_code.replace(decorator_string, "", 1)
             # TODO - pass globaldict to the server if possible, add option to do it
             # TODO - maybe use ast and inspect.getsourcefile() to add the rest of the code to make it work
-        return cls(function_code, func.__name__, port=port, backend=backend, wait=wait, backlog = 1024)
+        return cls(function_code, func.__name__, port=port, backend=backend, wait=100, backlog = 1024)
 
     # Default backend is multiprocessing because Popen doesn't open python in same env
     @staticmethod
     def run_code_async(server_code, backend):
         logging.info(f'using backend {backend}')
         logging.info("SERVER CODE IS - \n" + server_code.replace('\n', '\\n'))
-        if backend == 'Popen':
+        if backend == 'multiprocessing':
+            try:
+                server_process = Process(target=exec, args=(server_code, {}))
+                server_process.start()
+             except RuntimeError as e:
+                logging.warning(str(e))
+                logging.warning("ATTEMPTING TO DISABLE MULTIPROCESSING CHECK")
+                from multiprocessing import spawn
+                spawn._check_not_importing_main = lambda : None
+                server_process = Process(target=exec, args=(server_code, {}))
+                server_process.start()
+        elif backend == 'Popen':
             server_process = Popen(["python", "-c", server_code])
-        elif backend == 'multiprocessing':
-            server_process = Process(target=exec, args=(server_code, {}))
-            server_process.start()
         else:
             logging.error(f"Unknown Backend {backend}")
             raise ValueError(f"Unknown Backend {backend}")
         return server_process
 
-    def __init__(self, callable_code, callable_name, port=None, backend='multiprocessing', wait=True, backlog = 1024):
+    def __init__(self, callable_code, callable_name, port=None, backend='multiprocessing', wait=100, backlog = 1024):
         if port is None:
             self.port = self.get_specific_port(callable_code)
         elif not isinstance(port, int):
-            self.port = get_free_port(self.ip_address)
+            self.port = self.get_free_port(self.ip_address)
         else:
             self.port = port
 
         logging.info(f"using port {port} for {callable_name}")
         self.server_address = f'http://{self.ip_address}:{self.port}'
 
+        self.backlog = backlog
         self.backend = backend
         self.server_code = self.base_code.format(callable_code=inspect.cleandoc('\n' + callable_code),
-                                                 callable_name=callable_name, backlog = backlog,
+                                                 callable_name=callable_name, backlog = self.backlog,
                                                  ip_address=self.ip_address, port=self.port)
+                                                 
         if not self.port_inuse(self.ip_address, self.port):
             self.server_process = self.run_code_async(self.server_code, self.backend)
             atexit.register(self.__del__)  # Killing the run_code_async process is hard
@@ -145,9 +157,12 @@ class ServerHandler():
             logging.warning(f"port {self.port} not available to bind, server not started from here")
 
         if wait:
-            for attempt in range(100):
+            logging.info("Waiting for server to start")
+            for attempt in range(wait + 1):
                 try: urllib.request.urlopen(self.server_address).close(); break
-                except: assert attempt < 99; time.sleep(min(1, 0.01*(2**attempt)))
+                except: assert attempt < wait; time.sleep(min(1, 0.01*(2**attempt)))
+        
+        logging.info(f"{callable_name} is on {self.server_address}")
 
     def __call__(self, *args, **kwargs):
         with urllib.request.urlopen(self.server_address, pickle.dumps((args, kwargs))) as f:
@@ -176,21 +191,30 @@ class ServerHandler():
 
 class AsyncServerHandler(ServerHandler):
 
-    async def __call__(self, *args, **kwargs):
-        response = await self.ClientSession.post(self.server_address, data = pickle.dumps((args, kwargs)))
-        async with response:
+    TCPConnector_limit = 100 #default limit
+    ClientSession = None
+
+    async def _call_(self, *args, **kwargs):
+        if self.ClientSession is None:
+            self.ClientSession = await aiohttp.ClientSession(raise_for_status=True, connector=aiohttp.TCPConnector(limit=self.TCPConnector_limit))._aenter_()
+        try:
+            response = await self.ClientSession.post(self.server_address, data = pickle.dumps((args, kwargs)), ssl=False)
             return pickle.loads(await response.read())
-        
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args,**kwargs)
-        self.ClientSession = aiohttp.ClientSession(raise_for_status=True)
-        
-    def __setstate__(self, *args, **kwargs):
-        super().__setstate__(*args,**kwargs)
-        self.ClientSession = aiohttp.ClientSession(raise_for_status=True)
-        
+        except RuntimeError as e:
+            logging.warning("POSSIBLE EVENT LOOP ISSUE: " + str(e))
+            try: await self.ClientSession.close()
+            except: pass
+            self.ClientSession = await aiohttp.ClientSession(raise_for_status=True, connector=aiohttp.TCPConnector(limit=self.TCPConnector_limit))._aenter_()
+            response = await self.ClientSession.post(self.server_address, data=pickle.dumps((args, kwargs)), ssl=False)
+            return pickle.loads(await response.read())
+    
+    #Try everything to end ClientSession
     def __del__(self):
         try: asyncio.run(self.ClientSession.close())
+        except: pass
+        try: self.ClientSession.connector.close()
+        except: pass
+        try: self.ClientSession.detach()
         except: pass
         try: del self.ClientSession
         except: pass
