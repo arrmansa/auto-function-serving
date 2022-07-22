@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: auto-function-serving
-Version: 0.1.3
+Version: 0.1.4
 Summary: A python package to offload a function call to an http server automatically using a decorator.
 Author-email: Arrman Anicket Saha <arrmansa99+430@gmail.com>
 Project-URL: Homepage, https://github.com/arrmansa/auto-function-serving

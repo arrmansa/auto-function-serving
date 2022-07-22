@@ -194,9 +194,9 @@ class AsyncServerHandler(ServerHandler):
     TCPConnector_limit = 100 #default limit
     ClientSession = None
 
-    async def _call_(self, *args, **kwargs):
+    async def __call__(self, *args, **kwargs):
         if self.ClientSession is None:
-            self.ClientSession = await aiohttp.ClientSession(raise_for_status=True, connector=aiohttp.TCPConnector(limit=self.TCPConnector_limit))._aenter_()
+            self.ClientSession = await aiohttp.ClientSession(raise_for_status=True, connector=aiohttp.TCPConnector(limit=self.TCPConnector_limit))
         try:
             response = await self.ClientSession.post(self.server_address, data = pickle.dumps((args, kwargs)), ssl=False)
             return pickle.loads(await response.read())
@@ -204,7 +204,7 @@ class AsyncServerHandler(ServerHandler):
             logging.warning("POSSIBLE EVENT LOOP ISSUE: " + str(e))
             try: await self.ClientSession.close()
             except: pass
-            self.ClientSession = await aiohttp.ClientSession(raise_for_status=True, connector=aiohttp.TCPConnector(limit=self.TCPConnector_limit))._aenter_()
+            self.ClientSession = await aiohttp.ClientSession(raise_for_status=True, connector=aiohttp.TCPConnector(limit=self.TCPConnector_limit))
             response = await self.ClientSession.post(self.server_address, data=pickle.dumps((args, kwargs)), ssl=False)
             return pickle.loads(await response.read())
     
