@@ -194,4 +194,4 @@ class AsyncServerHandler(ServerHandler):
         except: pass
         try: del self.ClientSession
         except: pass
-        super().__del__(self)
+        super().__del__()

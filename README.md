@@ -80,11 +80,10 @@ We know the function is ready after we can recieve a valid get request from the 
 Inputs and outputs are sent as bytes, converted to and from objects using pickle.
 
 ## Performance (On my machine)
-overhead for small input and output (few bytes) - 
-~2ms for requests with urllib.request
-~5ms for async requests with aiohttp.ClientSession
-
-overhead for large input and output
+overhead for small input and output (few bytes) - \
+~2ms for requests with urllib.request\
+~5ms for async requests with aiohttp.ClientSession \
+overhead for large input and output\
 ~10ms for 0.5 mb input and output (1mb total transfer).\
 ~60ms for 5 mb input and output (10 mb total transfer).
 ~600ms for 50 mb input and output (100 mb total transfer).
