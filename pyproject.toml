@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "auto_function_serving"
-version = "0.0.6"
+version = "0.0.7"
 authors = [
   { name="Arrman Anicket Saha", email="arrmansa99+430@gmail.com" },
 ]
@@ -11,17 +11,6 @@ description = "A python package to offload a function call to an http server aut
 readme = "README.md"
 requires-python = ">=3.6"
 dependencies = [
-  "pickle",
-  "multiprocessing",
-  "subprocess",
-  "urllib",
-  "time",
-  "socket",
-  "inspect",
-  "atexit",
-  "hashlib",
-  "logging",
-  "asyncio",
   "aiohttp >= 3.7.2"
 ]
 classifiers = [
