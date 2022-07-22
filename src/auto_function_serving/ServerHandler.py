@@ -24,20 +24,25 @@ import asyncio
 import aiohttp
 
 class AsyncServerHandler(ServerHandler):
+
     async def __call__(self, *args, **kwargs):
-        response = await self.Client_Session.post(self.server_address, data = pickle.dumps((args, kwargs)))
+        response = await self.ClientSession.post(self.server_address, data = pickle.dumps((args, kwargs)))
         async with response:
             return pickle.loads(await response.read())
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args,**kwargs)
-        self.Client_Session = aiohttp.ClientSession(raise_for_status=True)
+        self.ClientSession = aiohttp.ClientSession(raise_for_status=True)
         
     def __setstate__(self, *args, **kwargs):
         super().__setstate__(*args,**kwargs)
-        self.Client_Session = aiohttp.ClientSession(raise_for_status=True)
-
-
+        self.ClientSession = aiohttp.ClientSession(raise_for_status=True)
+        
+    def __del__(self):
+        await self.ClientSession.close()
+        del self.ClientSession
+        super().__del__(self)
+        
 class ServerHandler():
 
     base_code = inspect.cleandoc("""
@@ -51,7 +56,7 @@ class ServerHandler():
     #Maximum socket backlog, is 5 by default
     #https://docs.python.org/3/library/socket.html#socket.socket.listen
     import socketserver
-    socketserver.TCPServer.request_queue_size = 128
+    socketserver.TCPServer.request_queue_size = {backlog}
     #Function to serve
 
     # TODO - catch exceptions in callable_code and handle it (maybe tempsocket.close() or sys.exit()
@@ -103,7 +108,7 @@ class ServerHandler():
                 return True
 
     @classmethod
-    def decorator(cls, func, port=None, backend='multiprocessing', wait=True):
+    def decorator(cls, func, port=None, backend='multiprocessing', wait=True, backlog = 1024):
         # assert hasattr(func, '__call__'), "decorated object should be callable"  #possible check to be added
         if hasattr(func, '__globals__'):
             globaldict = func.__globals__  # PROBABLY A FUNCTION
@@ -120,7 +125,7 @@ class ServerHandler():
                 function_code = function_code.replace(decorator_string, "", 1)
             # TODO - pass globaldict to the server if possible, add option to do it
             # TODO - maybe use ast and inspect.getsourcefile() to add the rest of the code to make it work
-        return cls(function_code, func.__name__, port=port, backend=backend, wait=wait)
+        return cls(function_code, func.__name__, port=port, backend=backend, wait=wait, backlog = 1024)
 
     # Default backend is multiprocessing because Popen doesn't open python in same env
     @staticmethod
@@ -137,7 +142,7 @@ class ServerHandler():
             raise ValueError(f"Unknown Backend {backend}")
         return server_process
 
-    def __init__(self, callable_code, callable_name, port=None, backend='multiprocessing', wait=True):
+    def __init__(self, callable_code, callable_name, port=None, backend='multiprocessing', wait=True, backlog = 1024):
         if port is None:
             self.port = self.get_specific_port(callable_code)
         elif not isinstance(port, int):
@@ -150,7 +155,7 @@ class ServerHandler():
 
         self.backend = backend
         self.server_code = self.base_code.format(callable_code=inspect.cleandoc('\n' + callable_code),
-                                                 callable_name=callable_name,
+                                                 callable_name=callable_name, backlog = backlog,
                                                  ip_address=self.ip_address, port=self.port)
         if not self.port_inuse(self.ip_address, self.port):
             self.server_process = self.run_code_async(self.server_code, self.backend)
