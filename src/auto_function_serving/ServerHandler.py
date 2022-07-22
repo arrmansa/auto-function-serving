@@ -84,8 +84,8 @@ class ServerHandler():
                 logging.warning(f"port {port} is in use")
                 return True
 
-    @staticmethod
-    def decorator(func, port=None, backend='multiprocessing', wait=True):
+    @classmethod
+    def decorator(cls, func, port=None, backend='multiprocessing', wait=True):
         # assert hasattr(func, '__call__'), "decorated object should be callable"  #possible check to be added
         if hasattr(func, '__globals__'):
             globaldict = func.__globals__  # PROBABLY A FUNCTION
@@ -97,9 +97,9 @@ class ServerHandler():
             function_code = f"from {func.__module__} import {func.__name__}"
         else:
             function_code = inspect.cleandoc('\n' + inspect.getsource(func))
-            decorator_string = '@ServerHandler.decorator\n'
-            if -1 < function_code.find("@ServerHandler.decorator\n") < function_code.find(f" {func.__name__}"):
-                function_code = function_code.replace("@ServerHandler.decorator\n", "", 1)
+            decorator_string = f'@{cls.__name__}.decorator\n'
+            if -1 < function_code.find(decorator_string) < function_code.find(f" {func.__name__}"):
+                function_code = function_code.replace(decorator_string, "", 1)
             # TODO - pass globaldict to the server if possible, add option to do it
             # TODO - maybe use ast and inspect.getsourcefile() to add the rest of the code to make it work
         return ServerHandler(function_code, func.__name__, port=port, backend=backend, wait=wait)
