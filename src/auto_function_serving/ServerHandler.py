@@ -118,7 +118,7 @@ class ServerHandler():
             try:
                 server_process = Process(target=exec, args=(server_code, {}))
                 server_process.start()
-             except RuntimeError as e:
+            except RuntimeError as e:
                 logging.warning(str(e))
                 logging.warning("ATTEMPTING TO DISABLE MULTIPROCESSING CHECK")
                 from multiprocessing import spawn
