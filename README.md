@@ -58,42 +58,49 @@ some independent code with a callable
     * if None, then the input code is hashed and a port is chosen from 50000 to 60000 using the hash
     * if int, then int is chosen
     * otherwise, a random open port is chosen
-2. backend - either 'Popen' or 'multiprocessing'
+2. backend - either 'Popen' or 'multiprocessing'. Popen Should be used in general.
 3. wait - approx max number of seconds to wait for the server to run. No waiting done if set to 0, default 100
 4. backlog - max number of backlogged requests before returning errors, python default is 5, but default in ServerHandler is 1024.
 
-
 ## Features
+
 runs [http.server.HTTPServer](https://docs.python.org/3/library/http.server.html).\
 ServerHandler and AsyncServerHandler objects can be loaded and unloaded with pickle.\
 Uses Popen or multiprocessing to run the server.\
 Uses only a single external dependency (aiohttp), and only for async.\
 http, not https.\
 chooses a port based on hash of input. (unless specified otherwise)
+
 ### Advantages
+
 Minimal code changes.\
-few ms overhead.\
 Should be compatible with almost all functions in almost all CPython envs. (Not sure where it could fail? Please add an issue if you find one.)\
-Memory leaks or errors (from the server) are extremely unlikely since it is minimal, single threaded, single process and a default component of python.\
+Memory leaks or errors (from the server) are extremely unlikely since it is minimal, single threaded, single process and a default component of python stdlib.\
+Exceptions cause 5xx errors without closing the server.\
 Even Separate Processes will make requests to 1 instance of the same server unless specified otherwise. (Because it's looking for a server on a specific port.).\
 Can specify otherwise by set the port to any free port so that a new ServerHandler object starts a new server.\
-http post requests : lightweight, few ms overhead, reliable.
+http post requests : lightweight, few ms overhead, reliable.\
+Async is a good feature.\
+now with tests.
 
 ### Disadvatages
-Async functions will not work on the server.\
-No auto server restart in case of failure.\
+
 Having a string of code as an argument to a class is not pythonic, unless the decorator is used.\
 Importing inside functions is not ideal, even when the decorator is used.\
 http post requests : insecure, few ms overhead.\
 Exceptions inside the server are not sent back.\
 No batching.\
 No inbuilt logging. (Could be added).
+Initialization delay of upto few seconds to start the server.
+Async functions will not work on the server.
 
 #### Possible Edge cases
+No auto server restart in case server closes.\
 May leave some resources locked for a while (<1min) if not closed properly.\
 Problems might occur if Popen or multiprocessing are not available.\
-Possible nested async errors? Please look into [nest-asyncio](https://pypi.org/project/nest-asyncio/) and the [iss](https://github.com/python/cpython/issues/93462)[ues](https://github.com/python/cpython/issues/66435).\
+Possible nested async errors with jupyter or other? Please look into [nest-asyncio](https://pypi.org/project/nest-asyncio/) and the [iss](https://github.com/python/cpython/issues/93462)[ues](https://github.com/python/cpython/issues/66435).\
 Warnings from somewhat hacky (but legit and completely functional) workarounds. \
+Closing of server process in __del__ and atexit.redister(__del__) fail for some reason (tested and unlikely). \
 
 
 ## Installation
