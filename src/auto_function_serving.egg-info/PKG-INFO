@@ -1,3 +1,17 @@
+Metadata-Version: 2.1
+Name: auto-function-serving
+Version: 0.1.6
+Summary: A python package to offload a function call to an http server automatically using a decorator.
+Author-email: Arrman Anicket Saha <arrmansa99+430@gmail.com>
+Project-URL: Homepage, https://github.com/arrmansa/auto-function-serving
+Project-URL: Bug Tracker, https://github.com/arrmansa/auto-function-serving/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
 # auto-function-serving
 
 A python package to offload a function call to an http server running on localhost automatically using a decorator. Compatible with multiprocessing, pickle, flask, fastapi, async etc..
@@ -95,13 +109,12 @@ Initialization delay of upto few seconds to start the server.
 Async functions will not work on the server.
 
 #### Possible Edge cases
-
 No auto server restart in case server closes.\
 May leave some resources locked for a while (<1min) if not closed properly.\
 Problems might occur if Popen or multiprocessing are not available.\
 Possible nested async errors with jupyter or other? Please look into [nest-asyncio](https://pypi.org/project/nest-asyncio/) and the [iss](https://github.com/python/cpython/issues/93462)[ues](https://github.com/python/cpython/issues/66435).\
 Warnings from somewhat hacky (but legit and completely functional) workarounds. \
-Closing of server process in __del__ and atexit.redister(__del__) fail for some reason (tested and unlikely).
+Closing of server process in __del__ and atexit.redister(__del__) fail for some reason (tested and unlikely). \
 
 
 ## Installation
@@ -112,7 +125,6 @@ pip install auto_function_serving
 ```
 
 ## How does this work?
-
 Code for the server is stored in [ServerHandler](https://github.com/arrmansa/auto-function-serving/blob/main/src/auto_function_serving/ServerHandler.py).base_code and some string formatting is used to fill in the blanks.\
 The server process is started with Popen (or multiprocessing if specified). The first thing it does is import socket and bind the port - if it's not available the code stops after an exception. Therefore only 1 instance of the server runs at a time on a machine.\
 We know the function is ready after we can receive a valid get request from the server.\
@@ -166,7 +178,6 @@ someheavyfunction = ServerHandler.decorator(someheavyfunction)
 Ip address can be changed by setting ServerHandler.ip_address (default "127.0.0.1") before creating a new instance.
 
 ### AsyncServerHandler
-
 AsyncServerHandler is also available which uses [aiohttp](https://docs.aiohttp.org/) to make the requests asynchronously, for use with fastapi and other async use cases. \
 AsyncServerHandler has the same usage as ServerHandler, except calls need to be awaited or used with asyncio.run() or with asyncio.get_event_loop().run_until_complete().\
 Number of async calls can be limited by setting AsyncServerHandler.TCPConnector_limit which controls the [TCPconnector](https://docs.aiohttp.org/en/stable/client_reference.html?highlight=connector#aiohttp.TCPConnector) limit (default 100). Using [Semaphore](https://docs.python.org/3/library/asyncio-sync.html#asyncio.Semaphore) is also something to consider.
