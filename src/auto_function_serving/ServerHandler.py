@@ -219,7 +219,7 @@ class AsyncServerHandler(ServerHandler):
     TCPConnector_limit = 100  # default limit
 
     def __init__(self, callable_code, callable_name, port=None, backend='Popen', wait=100, backlog=1024):
-        super().__init__(callable_code, callable_name, port=None, backend='Popen', wait=100, backlog=1024)
+        super().__init__(callable_code, callable_name, port=port, backend=backend, wait=wait, backlog=backlog)
         try:
             connector = aiohttp.TCPConnector(limit=self.TCPConnector_limit)
             self.ClientSession = aiohttp.ClientSession(raise_for_status=True, connector=connector)
