@@ -7,7 +7,7 @@ import time
 import unittest
 
 class alltests(unittest.TestCase):
-    def testeverything(self):
+    def test_everything(self):
         def servers_running():
             return [ServerHandler.port_inuse(ServerHandler.ip_address, port) for port in (1234, 58604, 52881)]
         assert servers_running() == [False, False, False], f"SERVERS ARE RUNNING, {servers_running()}"

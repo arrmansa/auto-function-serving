@@ -40,6 +40,8 @@ class ServerHandler():
     import socketserver
     socketserver.TCPServer.request_queue_size = {backlog}
     #Function to serve
+    import sys
+    sys.path = pickle.loads({pickle_sys_path})
 
     # TODO - catch exceptions in callable_code and handle it (maybe tempsocket.close() or sys.exit()
     {callable_code}
@@ -153,7 +155,8 @@ class ServerHandler():
             self.port = port
         logging.info(f"using port {port} for {callable_name}")
         self.server_address = f'http://{self.ip_address}:{self.port}'
-        self.server_code = self.base_code.format(callable_code=inspect.cleandoc('\n' + callable_code),
+        self.server_code = self.base_code.format(pickle_sys_path = pickle.dumps(sys.path), 
+                                                 callable_code=inspect.cleandoc('\n' + callable_code),
                                                  callable_name=callable_name, backlog=self.backlog,
                                                  ip_address=self.ip_address, port=self.port)
 
